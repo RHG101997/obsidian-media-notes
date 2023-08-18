@@ -77,7 +77,7 @@ export default class MyPlugin extends Plugin {
 		statusBarItemEl.setText('Media-Notes Running!');
 
 
-		this.registerMarkdownCodeBlockProcessor("timestamp", (source, el, ctx) => {
+		this.registerMarkdownCodeBlockProcessor("media-ts", (source, el, ctx) => {
 			const regExpWithHint = /(\d+:\d+:\d+|\d+:\d+)\s*:\s*(.+)/;
 			const regExpWithoutHint = /\d+:\d+:\d+|\d+:\d+/g;
 			const rows = source.split("\n").filter((row) => row.length > 0);
@@ -123,7 +123,115 @@ export default class MyPlugin extends Plugin {
 		});
 
 
-		this.registerMarkdownCodeBlockProcessor("timestamp-url", (source, el, ctx) => {
+		this.registerMarkdownCodeBlockProcessor("media", (source, el, ctx) => {
+			const prefix = "link :";
+			const lines = source.split('\n');
+			const links = lines.filter(line => line.trim().startsWith(prefix));
+		
+			if (links.length === 1) {
+				const linkLine = links[0];
+				const link = linkLine.substring(linkLine.indexOf(prefix) + prefix.length).trim();
+				const url = link.substring(0, link.length); // Removing the angle brackets
+		
+				// Creating div for the link
+				const div = el.createEl("div");
+
+				// Creating button with play symbol
+				const playSymbol = "▶"; // You can use any suitable play symbol here
+				const button = div.createEl("button");
+				button.innerText = playSymbol;
+				button.className = 'url-button';
+
+				button.addEventListener("click", () => {
+					this.activateView(url, this.editor);
+				});
+
+				// Creating link text and appending it next to the button
+				const linkElement = div.createEl("a");
+				linkElement.href = url;
+				linkElement.innerText = url;
+				div.appendChild(linkElement);
+				
+
+				button.addEventListener("click", () => {
+					this.activateView(url, this.editor);
+				});
+		
+				// Processing timestamps and hints
+				const regExpWithHint = /(\d+:\d+:\d+|\d+:\d+)\s*:\s*(.+)/;
+				const regExpWithoutHint = /\d+:\d+:\d+|\d+:\d+/g;
+				const timestampRows = lines.slice(lines.indexOf(linkLine) + 1).filter((row) => row.length > 0);
+		
+				timestampRows.forEach((row) => {
+					const matchWithHint = regExpWithHint.exec(row);
+					const matchWithoutHint = row.match(regExpWithoutHint);
+		
+					if (matchWithHint || matchWithoutHint) {
+						// create a button for each timestamp
+						const timestampDiv = el.createEl("div");
+						const timestampButton = timestampDiv.createEl("button");
+		
+						let timestamp: any;
+						if (matchWithHint) {
+							timestamp = matchWithHint[1];
+							timestampButton.innerText = ">>";
+							// timestampButton.innerText = timestamp;
+
+
+		
+							// create a text element for the hint
+							const hintElement = timestampDiv.createEl("span");
+							hintElement.className = 'timestamp-hint'; // Add this class for styling
+							hintElement.innerText = timestamp + " : " + matchWithHint[2]; // Matched hint
+							timestampDiv.appendChild(timestampButton); // Append the button first
+							timestampDiv.appendChild(hintElement); // Append the hint text next to the button
+						} else {
+							timestamp = matchWithoutHint[0];
+							timestampButton.innerText = ">>";
+							timestampDiv.appendChild(timestampButton);
+
+							const hintElement = timestampDiv.createEl("span");
+							hintElement.className = 'timestamp-hint'; // Add this class for styling
+							hintElement.innerText = timestamp; // Matched hint
+							timestampDiv.appendChild(timestampButton); // Append the button first
+							timestampDiv.appendChild(hintElement); // Append the hint text next to the button
+
+						}
+		
+						timestampButton.className = 'timestamp-button'; // Add this class for styling
+		
+						// convert timestamp to seconds and seek to that position when clicked
+						timestampButton.addEventListener("click", () => {
+							const timeArr = timestamp.split(":").map((v: any) => parseInt(v));
+							const [hh, mm, ss] = timeArr.length === 2 ? [0, ...timeArr] : timeArr;
+							const seconds = (hh || 0) * 3600 + (mm || 0) * 60 + (ss || 0);
+							if (this.player) this.player.seekTo(seconds);
+						});
+					}
+				});
+			} else if (links.length > 1) {
+				// Handling case where more than one link is found
+				if (this.editor) {
+					this.editor.replaceSelection(this.editor.getSelection() + "\n" + ERRORS["MULTIPLE_LINKS_FOUND"]);
+				}
+			} else {
+				// Handling case where no link is found
+				if (this.editor) {
+					this.editor.replaceSelection(this.editor.getSelection() + "\n" + ERRORS["INVALID_URL"]);
+				}
+			}
+		});
+
+
+		
+		
+		
+		
+		
+
+
+
+		this.registerMarkdownCodeBlockProcessor("media-url", (source, el, ctx) => {
 			const url = source.trim();
 			if (ReactPlayer.canPlay(url)) {
 				// Creates button for video url
